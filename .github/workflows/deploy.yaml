@@ -1,0 +1,5 @@
+name: deploy to aws the back for SMS front
+on:
+  push:
+    branches:
+      - development

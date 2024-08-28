@@ -1,0 +1,82 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: 'AWS::Serverless-2016-10-31'
+Resources:
+  MyApi:
+    Type: 'AWS::Serverless::Api'
+    Properties:
+      Name: MyApiGateway
+      StageName: prod
+      EndpointConfiguration: REGIONAL
+      ApiKeySourceType: HEADER
+      # Aquí defines tus rutas, métodos, y funciones Lambda asociadas
+      DefinitionBody:
+        swagger: 2.0
+        info:
+          title: My API
+        paths:
+          /mypath:
+            get:
+              x-amazon-apigateway-integration:
+                uri: !Sub 'arn:aws:apigateway:${AWS::Region}:lambda:path/2015-03-31/functions/${MyFunction.Arn}/invocations'
+                httpMethod: POST
+                type: aws_proxy
+              responses: {}
+              security:
+                - ApiKeyAuth: []
+      # Seguridad para el uso de API Key
+      securityDefinitions:
+        ApiKeyAuth:
+          type: apiKey
+          name: x-api-key
+          in: header
+
+  MyFunction:
+    Type: 'AWS::Serverless::Function'
+    Properties:
+      Handler: index.handler
+      Runtime: nodejs18.x
+      CodeUri: ./src
+      Policies:
+        - AWSLambdaBasicExecutionRole
+
+  MyApiUsagePlan:
+    Type: 'AWS::ApiGateway::UsagePlan'
+    Properties:
+      UsagePlanName: MyUsagePlan
+      ApiStages:
+        - ApiId: !Ref MyApi
+          Stage: prod
+      Throttle:
+        BurstLimit: 100
+        RateLimit: 50
+      Quota:
+        Limit: 1000
+        Period: MONTH
+
+  MyApiKey:
+    Type: 'AWS::ApiGateway::ApiKey'
+    Properties:
+      Enabled: true
+      Name: MyApiKey
+      StageKeys:
+        - RestApiId: !Ref MyApi
+          StageName: prod
+      # Puedes asignar valores de tags para identificar la clave
+      Tags:
+        - Key: Purpose
+          Value: Development
+
+  MyUsagePlanKey:
+    Type: 'AWS::ApiGateway::UsagePlanKey'
+    Properties:
+      KeyId: !Ref MyApiKey
+      KeyType: API_KEY
+      UsagePlanId: !Ref MyApiUsagePlan
+
+Outputs:
+  ApiUrl:
+    Description: "API Gateway URL"
+    Value: !Sub "https://${MyApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
+  ApiKey:
+    Description: "API Key for the API Gateway"
+    Value: !Ref MyApiKey
